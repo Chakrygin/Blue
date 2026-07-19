@@ -111,22 +111,22 @@ internal static class NewCommand
                     RunProcess("dotnet", out _, out _, out _,
                         "new", "uninstall", templateDir);
                 }
-                catch
+                catch (Exception ex)
                 {
-                    // Ignore cleanup errors
+                    Console.Error.WriteLine($"Failed to uninstall template: {ex.Message}");
                 }
             }
 
             if (cloneDir != null)
             {
                 try { Directory.Delete(cloneDir, recursive: true); }
-                catch { /* Ignore */ }
+                catch (Exception ex) { Console.Error.WriteLine($"Failed to delete clone directory: {ex.Message}"); }
             }
 
             if (templateDir != null)
             {
                 try { Directory.Delete(templateDir, recursive: true); }
-                catch { /* Ignore */ }
+                catch (Exception ex) { Console.Error.WriteLine($"Failed to delete template directory: {ex.Message}"); }
             }
         }
     }
