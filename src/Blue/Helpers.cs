@@ -41,7 +41,9 @@ internal static class Helpers
 
     internal static string CreateTempDirectory()
     {
-        var path = Path.Combine(Path.GetTempPath(), $"blue_{Guid.NewGuid()}");
+        var blueDir = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".blue");
+        var path = Path.Combine(blueDir, Guid.NewGuid().ToString("D"));
         Directory.CreateDirectory(path);
         return path;
     }
