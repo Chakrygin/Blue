@@ -75,7 +75,7 @@ internal static class NewCommand
             else
             {
                 Directory.CreateDirectory(configDir);
-                CreateDefaultTemplateConfig(configFile, templateRegistryId, repoUrl);
+                CreateDefaultTemplateConfig(configFile, templateRegistryId, repoUrl, templateDir);
             }
 
             Console.Error.WriteLine("Installing template...");
@@ -178,8 +178,10 @@ internal static class NewCommand
         }
     }
 
-    private static void CreateDefaultTemplateConfig(string configFilePath, string identity, string repoUrl)
+    private static void CreateDefaultTemplateConfig(string configFilePath, string identity, string repoUrl, string templateDir)
     {
+        var sourceName = ComputeSourceName(templateDir);
+
         var config = new JsonObject
         {
             ["$schema"] = "http://json.schemastore.org/template",
@@ -188,7 +190,40 @@ internal static class NewCommand
             ["shortName"] = identity
         };
 
+        if (sourceName != null)
+        {
+            config["sourceName"] = sourceName;
+        }
+
         var options = new JsonSerializerOptions { WriteIndented = true };
         File.WriteAllText(configFilePath, config.ToJsonString(options));
+    }
+
+    private static string? ComputeSourceName(string dir)
+    {
+        var solutionFiles = Directory.EnumerateFiles(dir, "*.*", SearchOption.AllDirectories)
+            .Where(f => f.EndsWith(".sln", StringComparison.OrdinalIgnoreCase)
+                     || f.EndsWith(".slnx", StringComparison.OrdinalIgnoreCase))
+            .Select(f => Path.GetFileNameWithoutExtension(f))
+            .ToList();
+
+        if (solutionFiles.Count == 0)
+            return null;
+
+        if (solutionFiles.Count == 1)
+            return solutionFiles[0];
+
+        var segments = solutionFiles.Select(f => f.Split('.')).ToList();
+        var prefix = segments[0];
+        for (var i = 1; i < segments.Count; i++)
+        {
+            var minLen = Math.Min(prefix.Length, segments[i].Length);
+            var j = 0;
+            while (j < minLen && string.Equals(prefix[j], segments[i][j], StringComparison.OrdinalIgnoreCase))
+                j++;
+            prefix = prefix[..j];
+        }
+
+        return prefix.Length > 0 ? string.Join(".", prefix) : null;
     }
 }
