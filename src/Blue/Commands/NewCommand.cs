@@ -8,17 +8,30 @@ internal static class NewCommand
 {
     internal static int Execute(string templateId, string[] extraArgs)
     {
-        var templateParts = templateId.Split('/');
+        var atIndex = templateId.IndexOf('@');
+        string ownerRepo;
+        string? version = null;
+        if (atIndex >= 0)
+        {
+            ownerRepo = templateId[..atIndex];
+            version = templateId[(atIndex + 1)..];
+        }
+        else
+        {
+            ownerRepo = templateId;
+        }
+
+        var templateParts = ownerRepo.Split('/');
         if (templateParts.Length != 2
             || string.IsNullOrWhiteSpace(templateParts[0])
             || string.IsNullOrWhiteSpace(templateParts[1]))
         {
-            Console.Error.WriteLine("Invalid template-id. Expected format: owner/repo");
+            Console.Error.WriteLine("Invalid template-id. Expected format: owner/repo or owner/repo@version");
             return 1;
         }
 
         var repoUrl = $"https://github.com/{templateParts[0]}/{templateParts[1]}.git";
-        var templateRegistryId = $"github.com/{templateId}";
+        var templateRegistryId = $"github.com/{ownerRepo}";
 
         if (!IsToolAvailable("git", "--version"))
         {
@@ -33,9 +46,16 @@ internal static class NewCommand
         try
         {
             cloneDir = CreateTempDirectory();
-            Console.Error.WriteLine($"Cloning {repoUrl}...");
-            RunProcess("git", out var gitExit, out _, out var gitErr,
-                "clone", "--depth", "1", repoUrl, cloneDir);
+            var cloneArgs = new List<string> { "clone", "--depth", "1" };
+            if (version != null)
+            {
+                cloneArgs.Add("--branch");
+                cloneArgs.Add(version);
+            }
+            cloneArgs.Add(repoUrl);
+            cloneArgs.Add(cloneDir);
+            Console.Error.WriteLine($"Cloning {repoUrl}{(version != null ? $" (branch/tag: {version})" : "")}...");
+            RunProcess("git", out var gitExit, out _, out var gitErr, [.. cloneArgs]);
             if (gitExit != 0)
             {
                 Console.Error.WriteLine($"Failed to clone repository:{Environment.NewLine}{gitErr}");
