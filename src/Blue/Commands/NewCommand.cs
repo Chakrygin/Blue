@@ -31,7 +31,7 @@ internal static class NewCommand
         }
 
         var repoUrl = $"https://github.com/{templateParts[0]}/{templateParts[1]}.git";
-        var templateRegistryId = $"github.com/{ownerRepo}";
+        var templateRegistryId = Guid.NewGuid().ToString("D");
 
         if (!IsToolAvailable("git", "--version"))
         {
@@ -75,7 +75,7 @@ internal static class NewCommand
             else
             {
                 Directory.CreateDirectory(configDir);
-                CreateDefaultTemplateConfig(configFile, templateRegistryId);
+                CreateDefaultTemplateConfig(configFile, templateRegistryId, repoUrl);
             }
 
             Console.Error.WriteLine("Installing template...");
@@ -172,29 +172,20 @@ internal static class NewCommand
         var json = JsonNode.Parse(File.ReadAllText(configFilePath));
         if (json is JsonObject obj)
         {
-            obj["identity"] = identity;
             obj["shortName"] = identity;
             var options = new JsonSerializerOptions { WriteIndented = true };
             File.WriteAllText(configFilePath, obj.ToJsonString(options));
         }
     }
 
-    private static void CreateDefaultTemplateConfig(string configFilePath, string identity)
+    private static void CreateDefaultTemplateConfig(string configFilePath, string identity, string repoUrl)
     {
         var config = new JsonObject
         {
             ["$schema"] = "http://json.schemastore.org/template",
-            ["author"] = $"Generated from {identity}",
-            ["classifications"] = new JsonArray("Template"),
             ["identity"] = identity,
-            ["name"] = identity,
-            ["shortName"] = identity,
-            ["sourceName"] = identity,
-            ["tags"] = new JsonObject
-            {
-                ["language"] = "C#",
-                ["type"] = "project"
-            }
+            ["name"] = repoUrl,
+            ["shortName"] = identity
         };
 
         var options = new JsonSerializerOptions { WriteIndented = true };
