@@ -4,7 +4,6 @@ using System.Diagnostics;
 using System.Numerics;
 using System.Text;
 using System.Text.RegularExpressions;
-using Blue.Commands;
 
 namespace Blue;
 
@@ -225,9 +224,8 @@ internal partial class Program
                 if (parts.Any(p => string.Equals(p, ".git", StringComparison.OrdinalIgnoreCase)))
                     continue;
 
-                var subDir = Path.Combine(templateDir, relative);
-                Console.Error.WriteLine($"  {relative}/");
-                Directory.CreateDirectory(subDir);
+                Console.Error.WriteLine($"  {relative.Replace('\\', '/')}/");
+                Directory.CreateDirectory(Path.Combine(templateDir, relative));
             }
 
             foreach (var filePath in Directory.EnumerateFiles(
@@ -243,12 +241,12 @@ internal partial class Program
                 if (destParent != null)
                     Directory.CreateDirectory(destParent);
 
-                Console.Error.WriteLine($"  {relative}");
+                Console.Error.WriteLine($"  {relative.Replace('\\', '/')}");
                 File.Copy(filePath, destFile, overwrite: true);
             }
         }
 
-        return NewCommand.Execute(templateId, extraArgs);
+        return 0;
     }
 
     private static bool IsValidName(string name)
