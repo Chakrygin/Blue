@@ -336,6 +336,58 @@ internal partial class Program
             }
         }
 
+        {
+            Console.Error.WriteLine("Creating project...");
+
+            var psi = new ProcessStartInfo
+            {
+                FileName = "dotnet",
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true
+            };
+
+            psi.ArgumentList.Add("new");
+            psi.ArgumentList.Add(runId);
+
+            foreach (var arg in extraArgs)
+            {
+                psi.ArgumentList.Add(arg);
+            }
+
+            using var process = new Process { StartInfo = psi };
+
+            try
+            {
+                process.Start();
+            }
+            catch (Win32Exception)
+            {
+                Console.Error.WriteLine("Failed to start dotnet process.");
+                return 1;
+            }
+
+            process.OutputDataReceived += (_, e) =>
+            {
+                if (e.Data != null) Console.Error.WriteLine(e.Data);
+            };
+
+            process.ErrorDataReceived += (_, e) =>
+            {
+                if (e.Data != null) Console.Error.WriteLine(e.Data);
+            };
+
+            process.BeginOutputReadLine();
+            process.BeginErrorReadLine();
+            process.WaitForExit();
+
+            if (process.ExitCode != 0)
+            {
+                return 1;
+            }
+        }
+
         return 0;
     }
 
