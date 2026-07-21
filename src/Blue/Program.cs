@@ -153,6 +153,64 @@ internal partial class Program
             cloneDir = Path.Combine(Path.GetTempPath(), $"blue_{runId}_r");
         }
 
+        {
+            var branchSuffix = branch != null ? $" ({branch})" : "";
+            Console.Error.WriteLine($"Cloning {repoUrl}{branchSuffix}...");
+
+            var psi = new ProcessStartInfo
+            {
+                FileName = "git",
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true
+            };
+
+            psi.ArgumentList.Add("clone");
+            psi.ArgumentList.Add("--depth");
+            psi.ArgumentList.Add("1");
+
+            if (branch != null)
+            {
+                psi.ArgumentList.Add("--branch");
+                psi.ArgumentList.Add(branch);
+            }
+
+            psi.ArgumentList.Add(repoUrl);
+            psi.ArgumentList.Add(cloneDir);
+
+            using var process = new Process { StartInfo = psi };
+
+            try
+            {
+                process.Start();
+            }
+            catch (Win32Exception)
+            {
+                Console.Error.WriteLine("Failed to start git clone process.");
+                return 1;
+            }
+
+            process.OutputDataReceived += (_, e) =>
+            {
+                if (e.Data != null) Console.Error.WriteLine(e.Data);
+            };
+
+            process.ErrorDataReceived += (_, e) =>
+            {
+                if (e.Data != null) Console.Error.WriteLine(e.Data);
+            };
+
+            process.BeginOutputReadLine();
+            process.BeginErrorReadLine();
+            process.WaitForExit();
+
+            if (process.ExitCode != 0)
+            {
+                return 1;
+            }
+        }
+
         return NewCommand.Execute(templateId, extraArgs);
     }
 
