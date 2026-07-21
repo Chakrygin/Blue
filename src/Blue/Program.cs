@@ -156,7 +156,11 @@ internal partial class Program
             templateDir = Path.Combine(Path.GetTempPath(), $"blue_{runId}_t");
         }
 
+        var isTemplateInstalled = false;
+
+        try
         {
+            {
             var branchSuffix = branch != null ? $" ({branch})" : "";
             Console.Error.WriteLine($"Cloning {repoUrl}{branchSuffix}...");
 
@@ -336,6 +340,8 @@ internal partial class Program
             }
         }
 
+            isTemplateInstalled = true;
+
         {
             Console.Error.WriteLine("Creating project...");
 
@@ -385,6 +391,48 @@ internal partial class Program
             if (process.ExitCode != 0)
             {
                 return 1;
+            }
+        }
+        }
+        finally
+        {
+            if (isTemplateInstalled)
+            {
+                try
+                {
+                    var psi = new ProcessStartInfo
+                    {
+                        FileName = "dotnet",
+                        UseShellExecute = false,
+                        CreateNoWindow = true,
+                        RedirectStandardOutput = true,
+                        RedirectStandardError = true
+                    };
+
+                    psi.ArgumentList.Add("new");
+                    psi.ArgumentList.Add("uninstall");
+                    psi.ArgumentList.Add(templateDir);
+
+                    using var process = new Process { StartInfo = psi };
+                    process.Start();
+                    process.WaitForExit();
+                }
+                catch (Exception ex)
+                {
+                    Console.Error.WriteLine($"Failed to uninstall template: {ex.Message}");
+                }
+            }
+
+            if (Directory.Exists(cloneDir))
+            {
+                try { Directory.Delete(cloneDir, recursive: true); }
+                catch (Exception ex) { Console.Error.WriteLine($"Failed to delete clone directory: {ex.Message}"); }
+            }
+
+            if (Directory.Exists(templateDir))
+            {
+                try { Directory.Delete(templateDir, recursive: true); }
+                catch (Exception ex) { Console.Error.WriteLine($"Failed to delete template directory: {ex.Message}"); }
             }
         }
 
