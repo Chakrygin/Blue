@@ -8,7 +8,6 @@ if (args.Length < 1)
 
 return args[0].ToLowerInvariant() switch
 {
-    "version" => VersionCommand.Execute(),
     "new" => args.Length < 2
         ? PrintUsage()
         : NewCommand.Execute(args[1], args[2..]),
