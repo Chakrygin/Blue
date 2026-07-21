@@ -3,6 +3,8 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.Numerics;
 using System.Text;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 
 namespace Blue;
@@ -246,7 +248,75 @@ internal partial class Program
             }
         }
 
+        {
+            var configDir = Path.Combine(templateDir, ".template.config");
+            var configFile = Path.Combine(configDir, "template.json");
+
+            if (File.Exists(configFile))
+            {
+                Console.Error.WriteLine("Modifying template.json...");
+                var json = JsonNode.Parse(File.ReadAllText(configFile));
+                if (json is JsonObject obj)
+                {
+                    obj["shortName"] = runId;
+                    var options = new JsonSerializerOptions { WriteIndented = true };
+                    File.WriteAllText(configFile, obj.ToJsonString(options));
+                }
+            }
+            else
+            {
+                Console.Error.WriteLine("Generating template.json...");
+                Directory.CreateDirectory(configDir);
+
+                var sourceName = ComputeSourceName(templateDir);
+
+                var config = new JsonObject
+                {
+                    ["$schema"] = "http://json.schemastore.org/template",
+                    ["identity"] = runId,
+                    ["name"] = repoUrl,
+                    ["shortName"] = runId
+                };
+
+                if (sourceName != null)
+                {
+                    config["sourceName"] = sourceName;
+                }
+
+                var options = new JsonSerializerOptions { WriteIndented = true };
+                File.WriteAllText(configFile, config.ToJsonString(options));
+            }
+        }
+
         return 0;
+    }
+
+    private static string? ComputeSourceName(string dir)
+    {
+        var solutionFiles = Directory.EnumerateFiles(dir, "*.*", SearchOption.AllDirectories)
+            .Where(f => f.EndsWith(".sln", StringComparison.OrdinalIgnoreCase)
+                     || f.EndsWith(".slnx", StringComparison.OrdinalIgnoreCase))
+            .Select(f => Path.GetFileNameWithoutExtension(f))
+            .ToList();
+
+        if (solutionFiles.Count == 0)
+            return null;
+
+        if (solutionFiles.Count == 1)
+            return solutionFiles[0];
+
+        var segments = solutionFiles.Select(f => f.Split('.')).ToList();
+        var prefix = segments[0];
+        for (var i = 1; i < segments.Count; i++)
+        {
+            var minLen = Math.Min(prefix.Length, segments[i].Length);
+            var j = 0;
+            while (j < minLen && string.Equals(prefix[j], segments[i][j], StringComparison.OrdinalIgnoreCase))
+                j++;
+            prefix = prefix[..j];
+        }
+
+        return prefix.Length > 0 ? string.Join(".", prefix) : null;
     }
 
     private static bool IsValidName(string name)
