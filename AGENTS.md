@@ -7,7 +7,6 @@ Single-project .NET global tool (`dotnet tool`). Published on NuGet as `Blue`.
 ```powershell
 dotnet build
 dotnet run -- version
-dotnet run -- upgrade
 dotnet run -- new owner/repo -n MyProject --output ./MyProject
 ```
 
@@ -31,7 +30,6 @@ Requires .NET SDK `10.0.100` (`global.json`). Available via `dotnet` in PATH.
 `src/Blue/Program.cs` — top-level statements, routes `args[0]` via switch:
 
 - `version` → prints Blue, .NET SDK, and Git versions
-- `upgrade` → `dotnet tool update --global blue`
 - `new <owner/repo>` → `git clone --depth 1` from GitHub, applies `.template.config/template.json`, runs `dotnet new install`, calls `dotnet new`, then cleans up temp dirs
 
 ## CI/CD
