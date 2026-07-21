@@ -148,9 +148,11 @@ internal partial class Program
         }
 
         string cloneDir;
+        string templateDir;
 
         {
             cloneDir = Path.Combine(Path.GetTempPath(), $"blue_{runId}_r");
+            templateDir = Path.Combine(Path.GetTempPath(), $"blue_{runId}_t");
         }
 
         {
@@ -208,6 +210,41 @@ internal partial class Program
             if (process.ExitCode != 0)
             {
                 return 1;
+            }
+        }
+
+        {
+            Console.Error.WriteLine("Copying template files...");
+            Directory.CreateDirectory(templateDir);
+
+            foreach (var dirPath in Directory.EnumerateDirectories(
+                cloneDir, "*", SearchOption.AllDirectories))
+            {
+                var relative = Path.GetRelativePath(cloneDir, dirPath);
+                var parts = relative.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                if (parts.Any(p => string.Equals(p, ".git", StringComparison.OrdinalIgnoreCase)))
+                    continue;
+
+                var subDir = Path.Combine(templateDir, relative);
+                Console.Error.WriteLine($"  {relative}/");
+                Directory.CreateDirectory(subDir);
+            }
+
+            foreach (var filePath in Directory.EnumerateFiles(
+                cloneDir, "*", SearchOption.AllDirectories))
+            {
+                var relative = Path.GetRelativePath(cloneDir, filePath);
+                var parts = relative.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                if (parts.Any(p => string.Equals(p, ".git", StringComparison.OrdinalIgnoreCase)))
+                    continue;
+
+                var destFile = Path.Combine(templateDir, relative);
+                var destParent = Path.GetDirectoryName(destFile);
+                if (destParent != null)
+                    Directory.CreateDirectory(destParent);
+
+                Console.Error.WriteLine($"  {relative}");
+                File.Copy(filePath, destFile, overwrite: true);
             }
         }
 
