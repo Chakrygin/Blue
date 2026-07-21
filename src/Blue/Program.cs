@@ -147,6 +147,12 @@ internal partial class Program
             runId = sb.ToString();
         }
 
+        string cloneDir;
+
+        {
+            cloneDir = Path.Combine(Path.GetTempPath(), $"blue_{runId}_r");
+        }
+
         return NewCommand.Execute(templateId, extraArgs);
     }
 
