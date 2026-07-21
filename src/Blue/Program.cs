@@ -1,6 +1,9 @@
 ﻿using System.CommandLine;
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Numerics;
+using System.Text;
+using System.Text.RegularExpressions;
 using Blue.Commands;
 
 namespace Blue;
@@ -89,6 +92,66 @@ internal partial class Program
             }
         }
 
+        string repoUrl;
+        string? branch;
+
+        {
+            var atIndex = templateId.IndexOf('@');
+            if (atIndex >= 0)
+            {
+                branch = templateId[(atIndex + 1)..];
+                templateId = templateId[..atIndex];
+            }
+            else
+            {
+                branch = null;
+            }
+
+            if (templateId.StartsWith("https://"))
+            {
+                repoUrl = templateId;
+            }
+            else
+            {
+                var parts = templateId.Split('/');
+                if (parts.Length != 2
+                    || string.IsNullOrWhiteSpace(parts[0])
+                    || string.IsNullOrWhiteSpace(parts[1])
+                    || !IsValidName(parts[0])
+                    || !IsValidName(parts[1]))
+                {
+                    Console.Error.WriteLine("Invalid template-id. Expected format: owner/repo or owner/repo@version or https://...");
+                    return 1;
+                }
+
+                repoUrl = $"https://github.com/{parts[0]}/{parts[1]}.git";
+            }
+        }
+
+        string runId;
+
+        {
+            var guid = Guid.NewGuid();
+            var bytes = guid.ToByteArray();
+            var value = new BigInteger(bytes, isUnsigned: true);
+
+            const string alphabet = "0123456789abcdefghijklmnopqrstuvwxyz";
+            var sb = new StringBuilder();
+
+            while (value > 0)
+            {
+                value = BigInteger.DivRem(value, alphabet.Length, out var remainder);
+                sb.Insert(0, alphabet[(int)remainder]);
+            }
+
+            runId = sb.ToString();
+        }
+
         return NewCommand.Execute(templateId, extraArgs);
+    }
+
+    private static bool IsValidName(string name)
+    {
+        return Regex.IsMatch(name, @"^[a-zA-Z0-9._-]+$");
     }
 }
