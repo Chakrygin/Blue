@@ -9,4 +9,8 @@
     <ToolCommandName>blue</ToolCommandName>
   </PropertyGroup>
 
+  <ItemGroup>
+    <PackageReference Include="System.CommandLine" />
+  </ItemGroup>
+
 </Project>
