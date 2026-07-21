@@ -8,6 +8,7 @@
     <AssemblyName>blue</AssemblyName>
     <PackAsTool>true</PackAsTool>
     <ToolCommandName>blue</ToolCommandName>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
   </PropertyGroup>
 
   <ItemGroup>
