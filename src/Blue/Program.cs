@@ -423,16 +423,29 @@ internal partial class Program
                 }
             }
 
-            if (Directory.Exists(cloneDir))
-            {
-                try { Directory.Delete(cloneDir, recursive: true); }
-                catch (Exception ex) { Console.Error.WriteLine($"Failed to delete clone directory: {ex.Message}"); }
-            }
+            ForceDeleteDirectory(cloneDir);
+            ForceDeleteDirectory(templateDir);
 
-            if (Directory.Exists(templateDir))
+            void ForceDeleteDirectory(string path)
             {
-                try { Directory.Delete(templateDir, recursive: true); }
-                catch (Exception ex) { Console.Error.WriteLine($"Failed to delete template directory: {ex.Message}"); }
+                if (!Directory.Exists(path)) return;
+
+                try
+                {
+                    foreach (var file in Directory.GetFiles(path))
+                    {
+                        File.SetAttributes(file, FileAttributes.Normal);
+                        File.Delete(file);
+                    }
+
+                    foreach (var dir in Directory.GetDirectories(path))
+                    {
+                        ForceDeleteDirectory(dir);
+                    }
+
+                    Directory.Delete(path);
+                }
+                catch { }
             }
         }
 
