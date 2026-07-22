@@ -5,92 +5,23 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
+using Blue.Tools.DotNet;
+using Blue.Tools.Git;
 
 namespace Blue.Commands;
 
 internal class NewCommandV2
 {
+    private readonly GitTool _gitTool = new();
+    private readonly DotNetTool _dotnetTool = new();
+
     public int Run(string templateId, string[] extraArgs)
     {
-        {
-            Console.Error.WriteLine("Checking for Git...");
+        if (!_gitTool.CheckAvailable())
+            return 1;
 
-            var psi = new ProcessStartInfo
-            {
-                FileName = "git",
-                UseShellExecute = false,
-                CreateNoWindow = true,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true
-            };
-
-            psi.ArgumentList.Add("--version");
-
-            using var process = new Process { StartInfo = psi };
-
-            try
-            {
-                process.Start();
-            }
-            catch (Win32Exception)
-            {
-                Console.Error.WriteLine("Oops... Git not found. Please install Git from https://git-scm.com/");
-                return 1;
-            }
-
-            var output = process.StandardOutput.ReadToEnd();
-            process.WaitForExit();
-
-            if (process.ExitCode == 0)
-            {
-                Console.Error.WriteLine($"Git found: {output.Trim()}");
-            }
-            else
-            {
-                Console.Error.WriteLine("Oops... Git not found. Please install Git from https://git-scm.com/");
-                return 1;
-            }
-        }
-
-        {
-            Console.Error.WriteLine("Checking for dotnet...");
-
-            var psi = new ProcessStartInfo
-            {
-                FileName = "dotnet",
-                UseShellExecute = false,
-                CreateNoWindow = true,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true
-            };
-
-            psi.ArgumentList.Add("--version");
-
-            using var process = new Process { StartInfo = psi };
-
-            try
-            {
-                process.Start();
-            }
-            catch (Win32Exception)
-            {
-                Console.Error.WriteLine("Oops... dotnet not found. Please install .NET SDK from https://dotnet.microsoft.com/download");
-                return 1;
-            }
-
-            var output = process.StandardOutput.ReadToEnd();
-            process.WaitForExit();
-
-            if (process.ExitCode == 0)
-            {
-                Console.Error.WriteLine($"dotnet found: {output.Trim()}");
-            }
-            else
-            {
-                Console.Error.WriteLine("Oops... dotnet not found. Please install .NET SDK from https://dotnet.microsoft.com/download");
-                return 1;
-            }
-        }
+        if (!_dotnetTool.CheckAvailable())
+            return 1;
 
         string repoUrl;
         string? branch;
