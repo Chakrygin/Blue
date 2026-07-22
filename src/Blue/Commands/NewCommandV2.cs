@@ -1,5 +1,3 @@
-using System.ComponentModel;
-using System.Diagnostics;
 using System.Numerics;
 using System.Text;
 using System.Text.Json;
@@ -90,268 +88,95 @@ internal class NewCommandV2
 
         try
         {
-            {
-            var branchSuffix = branch != null ? $" ({branch})" : "";
-            Console.Error.WriteLine($"Cloning {repoUrl}{branchSuffix}...");
-
-            var psi = new ProcessStartInfo
-            {
-                FileName = "git",
-                UseShellExecute = false,
-                CreateNoWindow = true,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true
-            };
-
-            psi.ArgumentList.Add("clone");
-            psi.ArgumentList.Add("--depth");
-            psi.ArgumentList.Add("1");
-
-            if (branch != null)
-            {
-                psi.ArgumentList.Add("--branch");
-                psi.ArgumentList.Add(branch);
-            }
-
-            psi.ArgumentList.Add(repoUrl);
-            psi.ArgumentList.Add(cloneDir);
-
-            using var process = new Process { StartInfo = psi };
-
-            try
-            {
-                process.Start();
-            }
-            catch (Win32Exception)
-            {
-                Console.Error.WriteLine("Failed to start git clone process.");
+            if (!_gitTool.Clone(repoUrl, branch, cloneDir))
                 return 1;
-            }
 
-            process.OutputDataReceived += (_, e) =>
             {
-                if (e.Data != null) Console.Error.WriteLine(e.Data);
-            };
+                Console.Error.WriteLine("Copying template files...");
+                Directory.CreateDirectory(templateDir);
 
-            process.ErrorDataReceived += (_, e) =>
-            {
-                if (e.Data != null) Console.Error.WriteLine(e.Data);
-            };
-
-            process.BeginOutputReadLine();
-            process.BeginErrorReadLine();
-            process.WaitForExit();
-
-            if (process.ExitCode != 0)
-            {
-                return 1;
-            }
-        }
-
-        {
-            Console.Error.WriteLine("Copying template files...");
-            Directory.CreateDirectory(templateDir);
-
-            foreach (var dirPath in Directory.EnumerateDirectories(
-                cloneDir, "*", SearchOption.AllDirectories))
-            {
-                var relative = Path.GetRelativePath(cloneDir, dirPath);
-                var parts = relative.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-                if (parts.Any(p => string.Equals(p, ".git", StringComparison.OrdinalIgnoreCase)))
-                    continue;
-
-                Console.Error.WriteLine($"  {relative.Replace('\\', '/')}/");
-                Directory.CreateDirectory(Path.Combine(templateDir, relative));
-            }
-
-            foreach (var filePath in Directory.EnumerateFiles(
-                cloneDir, "*", SearchOption.AllDirectories))
-            {
-                var relative = Path.GetRelativePath(cloneDir, filePath);
-                var parts = relative.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-                if (parts.Any(p => string.Equals(p, ".git", StringComparison.OrdinalIgnoreCase)))
-                    continue;
-
-                var destFile = Path.Combine(templateDir, relative);
-                var destParent = Path.GetDirectoryName(destFile);
-                if (destParent != null)
-                    Directory.CreateDirectory(destParent);
-
-                Console.Error.WriteLine($"  {relative.Replace('\\', '/')}");
-                File.Copy(filePath, destFile, overwrite: true);
-            }
-        }
-
-        {
-            var configDir = Path.Combine(templateDir, ".template.config");
-            var configFile = Path.Combine(configDir, "template.json");
-
-            if (File.Exists(configFile))
-            {
-                Console.Error.WriteLine("Modifying template.json...");
-                var json = JsonNode.Parse(File.ReadAllText(configFile));
-                if (json is JsonObject obj)
+                foreach (var dirPath in Directory.EnumerateDirectories(
+                    cloneDir, "*", SearchOption.AllDirectories))
                 {
-                    obj["shortName"] = runId;
+                    var relative = Path.GetRelativePath(cloneDir, dirPath);
+                    var parts = relative.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                    if (parts.Any(p => string.Equals(p, ".git", StringComparison.OrdinalIgnoreCase)))
+                        continue;
+
+                    Console.Error.WriteLine($"  {relative.Replace('\\', '/')}/");
+                    Directory.CreateDirectory(Path.Combine(templateDir, relative));
+                }
+
+                foreach (var filePath in Directory.EnumerateFiles(
+                    cloneDir, "*", SearchOption.AllDirectories))
+                {
+                    var relative = Path.GetRelativePath(cloneDir, filePath);
+                    var parts = relative.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                    if (parts.Any(p => string.Equals(p, ".git", StringComparison.OrdinalIgnoreCase)))
+                        continue;
+
+                    var destFile = Path.Combine(templateDir, relative);
+                    var destParent = Path.GetDirectoryName(destFile);
+                    if (destParent != null)
+                        Directory.CreateDirectory(destParent);
+
+                    Console.Error.WriteLine($"  {relative.Replace('\\', '/')}");
+                    File.Copy(filePath, destFile, overwrite: true);
+                }
+            }
+
+            {
+                var configDir = Path.Combine(templateDir, ".template.config");
+                var configFile = Path.Combine(configDir, "template.json");
+
+                if (File.Exists(configFile))
+                {
+                    Console.Error.WriteLine("Modifying template.json...");
+                    var json = JsonNode.Parse(File.ReadAllText(configFile));
+                    if (json is JsonObject obj)
+                    {
+                        obj["shortName"] = runId;
+                        var options = new JsonSerializerOptions { WriteIndented = true };
+                        File.WriteAllText(configFile, obj.ToJsonString(options));
+                    }
+                }
+                else
+                {
+                    Console.Error.WriteLine("Generating template.json...");
+                    Directory.CreateDirectory(configDir);
+
+                    var sourceName = ComputeSourceName(templateDir);
+
+                    var config = new JsonObject
+                    {
+                        ["$schema"] = "http://json.schemastore.org/template",
+                        ["identity"] = runId,
+                        ["name"] = repoUrl,
+                        ["shortName"] = runId
+                    };
+
+                    if (sourceName != null)
+                    {
+                        config["sourceName"] = sourceName;
+                    }
+
                     var options = new JsonSerializerOptions { WriteIndented = true };
-                    File.WriteAllText(configFile, obj.ToJsonString(options));
+                    File.WriteAllText(configFile, config.ToJsonString(options));
                 }
             }
-            else
-            {
-                Console.Error.WriteLine("Generating template.json...");
-                Directory.CreateDirectory(configDir);
 
-                var sourceName = ComputeSourceName(templateDir);
-
-                var config = new JsonObject
-                {
-                    ["$schema"] = "http://json.schemastore.org/template",
-                    ["identity"] = runId,
-                    ["name"] = repoUrl,
-                    ["shortName"] = runId
-                };
-
-                if (sourceName != null)
-                {
-                    config["sourceName"] = sourceName;
-                }
-
-                var options = new JsonSerializerOptions { WriteIndented = true };
-                File.WriteAllText(configFile, config.ToJsonString(options));
-            }
-        }
-
-        {
-            Console.Error.WriteLine("Installing template...");
-
-            var psi = new ProcessStartInfo
-            {
-                FileName = "dotnet",
-                UseShellExecute = false,
-                CreateNoWindow = true,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true
-            };
-
-            psi.ArgumentList.Add("new");
-            psi.ArgumentList.Add("install");
-            psi.ArgumentList.Add(templateDir);
-
-            using var process = new Process { StartInfo = psi };
-
-            try
-            {
-                process.Start();
-            }
-            catch (Win32Exception)
-            {
-                Console.Error.WriteLine("Failed to start dotnet process.");
+            if (!_dotnetTool.InstallTemplate(templateDir))
                 return 1;
-            }
-
-            process.OutputDataReceived += (_, e) =>
-            {
-                if (e.Data != null) Console.Error.WriteLine(e.Data);
-            };
-
-            process.ErrorDataReceived += (_, e) =>
-            {
-                if (e.Data != null) Console.Error.WriteLine(e.Data);
-            };
-
-            process.BeginOutputReadLine();
-            process.BeginErrorReadLine();
-            process.WaitForExit();
-
-            if (process.ExitCode != 0)
-            {
-                return 1;
-            }
-        }
 
             isTemplateInstalled = true;
 
-        {
-            Console.Error.WriteLine("Creating project...");
-
-            var psi = new ProcessStartInfo
-            {
-                FileName = "dotnet",
-                UseShellExecute = false,
-                CreateNoWindow = true,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true
-            };
-
-            psi.ArgumentList.Add("new");
-            psi.ArgumentList.Add(runId);
-
-            foreach (var arg in extraArgs)
-            {
-                psi.ArgumentList.Add(arg);
-            }
-
-            using var process = new Process { StartInfo = psi };
-
-            try
-            {
-                process.Start();
-            }
-            catch (Win32Exception)
-            {
-                Console.Error.WriteLine("Failed to start dotnet process.");
+            if (!_dotnetTool.CreateProject(runId, extraArgs))
                 return 1;
-            }
-
-            process.OutputDataReceived += (_, e) =>
-            {
-                if (e.Data != null) Console.Error.WriteLine(e.Data);
-            };
-
-            process.ErrorDataReceived += (_, e) =>
-            {
-                if (e.Data != null) Console.Error.WriteLine(e.Data);
-            };
-
-            process.BeginOutputReadLine();
-            process.BeginErrorReadLine();
-            process.WaitForExit();
-
-            if (process.ExitCode != 0)
-            {
-                return 1;
-            }
-        }
         }
         finally
         {
             if (isTemplateInstalled)
-            {
-                try
-                {
-                    var psi = new ProcessStartInfo
-                    {
-                        FileName = "dotnet",
-                        UseShellExecute = false,
-                        CreateNoWindow = true,
-                        RedirectStandardOutput = true,
-                        RedirectStandardError = true
-                    };
-
-                    psi.ArgumentList.Add("new");
-                    psi.ArgumentList.Add("uninstall");
-                    psi.ArgumentList.Add(templateDir);
-
-                    using var process = new Process { StartInfo = psi };
-                    process.Start();
-                    process.WaitForExit();
-                }
-                catch (Exception ex)
-                {
-                    Console.Error.WriteLine($"Failed to uninstall template: {ex.Message}");
-                }
-            }
+                _dotnetTool.UninstallTemplate(templateDir);
 
             ForceDeleteDirectory(cloneDir);
             ForceDeleteDirectory(templateDir);
